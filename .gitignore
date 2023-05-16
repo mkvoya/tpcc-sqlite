@@ -1,3 +1,5 @@
 tpcc.db
 *cscope*
 *.db
+/tpcc_load
+/tpcc_start
