@@ -7,7 +7,7 @@
 #include <stdatomic.h>
 
 enum instrumentation_vars {
-	open_t,      
+	open_t,
 	close_t,
 	pread_t,
 	pwrite_t,
@@ -27,8 +27,8 @@ enum instrumentation_vars {
 	INSTRUMENT_NUM,
 };
 
-atomic_uint_least64_t Instrustats[INSTRUMENT_NUM];
-static const char *Instruprint[INSTRUMENT_NUM] =
+extern atomic_uint_least64_t Instrustats[INSTRUMENT_NUM];
+static inline const char *Instruprint[INSTRUMENT_NUM] =
 {
 	"open",
 	"close",

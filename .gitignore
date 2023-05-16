@@ -3,3 +3,4 @@ tpcc.db
 *.db
 /tpcc_load
 /tpcc_start
+*.o
