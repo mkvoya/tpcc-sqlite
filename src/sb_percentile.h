@@ -21,23 +21,23 @@
 #include "timers.h"
 
 #ifdef HAVE_PTHREAD_H
-# include <pthread.h>
+#include <pthread.h>
 #endif
 
 typedef struct {
-  unsigned long long  *values;
-  unsigned long long  *tmp;
-  unsigned long long  total;
-  unsigned int        size;
-  double              range_min;
-  double              range_max;
-  double              range_deduct;
-  double              range_mult;
-  pthread_mutex_t     mutex;
+	unsigned long long *values;
+	unsigned long long *tmp;
+	unsigned long long total;
+	unsigned int size;
+	double range_min;
+	double range_max;
+	double range_deduct;
+	double range_mult;
+	pthread_mutex_t mutex;
 } sb_percentile_t;
 
-int sb_percentile_init(sb_percentile_t *percentile,
-                       unsigned int size, double range_min, double range_max);
+int sb_percentile_init(sb_percentile_t *percentile, unsigned int size,
+		       double range_min, double range_max);
 
 void sb_percentile_update(sb_percentile_t *percentile, double value);
 

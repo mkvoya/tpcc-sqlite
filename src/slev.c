@@ -18,24 +18,23 @@ extern sqlite3_stmt ***stmt;
 /*
  * the stock level transaction
  */
-int slev( int t_num,
-	  int w_id_arg,		/* warehouse id */
-	  int d_id_arg,		/* district id */
-	  int level_arg		/* stock level */
+int slev(int t_num, int w_id_arg, /* warehouse id */
+	 int d_id_arg, /* district id */
+	 int level_arg /* stock level */
 )
 {
 	int ret;
-	int            w_id = w_id_arg;
-	int            d_id = d_id_arg;
-	int            level = level_arg;
-	int            d_next_o_id;
-	int            i_count;
-	int            ol_i_id;
+	int w_id = w_id_arg;
+	int d_id = d_id_arg;
+	int level = level_arg;
+	int d_next_o_id;
+	int i_count;
+	int ol_i_id;
 
 	sqlite3_stmt *sqlite_stmt;
 	sqlite3_stmt *sqlite_stmt2;
 	int num_cols;
-	
+
 	/*EXEC SQL WHENEVER NOT FOUND GOTO sqlerr;*/
 	/*EXEC SQL WHENEVER SQLERROR GOTO sqlerr;*/
 
@@ -55,9 +54,11 @@ int slev( int t_num,
 
 	ret = sqlite3_step(sqlite_stmt);
 	if (ret != SQLITE_DONE) {
-		if (ret != SQLITE_ROW) goto sqlerr;
+		if (ret != SQLITE_ROW)
+			goto sqlerr;
 		num_cols = sqlite3_column_count(sqlite_stmt);
-		if (num_cols != 1) goto sqlerr;
+		if (num_cols != 1)
+			goto sqlerr;
 
 		d_next_o_id = sqlite3_column_int64(sqlite_stmt, 0);
 	}
@@ -84,9 +85,9 @@ int slev( int t_num,
 	sqlite3_bind_int64(sqlite_stmt, 4, d_next_o_id);
 
 	while (sqlite3_step(sqlite_stmt) != SQLITE_DONE) {
-
 		num_cols = sqlite3_column_count(sqlite_stmt);
-		if (num_cols != 1) goto sqlerr;
+		if (num_cols != 1)
+			goto sqlerr;
 		ol_i_id = sqlite3_column_int64(sqlite_stmt, 0);
 
 		/*EXEC_SQL SELECT count(*) INTO :i_count
@@ -102,14 +103,15 @@ int slev( int t_num,
 
 		ret = sqlite3_step(sqlite_stmt2);
 		if (ret != SQLITE_DONE) {
-			if (ret != SQLITE_ROW) goto sqlerr;
+			if (ret != SQLITE_ROW)
+				goto sqlerr;
 			num_cols = sqlite3_column_count(sqlite_stmt2);
-			if (num_cols != 1) goto sqlerr;
+			if (num_cols != 1)
+				goto sqlerr;
 			i_count = sqlite3_column_int64(sqlite_stmt2, 0);
 		}
 
 		sqlite3_reset(sqlite_stmt2);
-
 	}
 
 	sqlite3_reset(sqlite_stmt);
@@ -121,19 +123,19 @@ done:
 	return (1);
 
 sqlerr:
-        fprintf(stderr,"slev\n");
+	fprintf(stderr, "slev\n");
 	printf("%s: error: %s\n", __func__, sqlite3_errmsg(ctx[t_num]));
 	//error(ctx[t_num],mysql_stmt);
-        /*EXEC SQL WHENEVER SQLERROR GOTO sqlerrerr;*/
+	/*EXEC SQL WHENEVER SQLERROR GOTO sqlerrerr;*/
 	/*EXEC_SQL ROLLBACK WORK;*/
 	sqlite3_exec(ctx[t_num], "ROLLBACK;", NULL, NULL, NULL);
 	return (0);
 
 sqlerr2:
-	fprintf(stderr,"slev\n");
+	fprintf(stderr, "slev\n");
 	printf("%s: error: %s\n", __func__, sqlite3_errmsg(ctx[t_num]));
 	//error(ctx[t_num],mysql_stmt2);
-        /*EXEC SQL WHENEVER SQLERROR GOTO sqlerrerr;*/
+	/*EXEC SQL WHENEVER SQLERROR GOTO sqlerrerr;*/
 	/*EXEC_SQL ROLLBACK WORK;*/
 	//mysql_stmt_free_result(mysql_stmt);
 	//mysql_rollback(ctx[t_num]);
