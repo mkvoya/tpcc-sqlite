@@ -98,6 +98,8 @@ int thread_main(thread_arg *);
 void alarm_handler(int signum);
 void alarm_dummy();
 
+char *dbpath = NULL;
+
 int main(int argc, char *argv[])
 {
 	int i, k, t_num, arg_offset, c;
@@ -141,6 +143,7 @@ int main(int argc, char *argv[])
 	num_conn = 10;
 	lampup_time = 10;
 	measure_time = 20;
+	num_trans = 10000;
 
 	/* number of node (default 0) */
 	num_node = 0;
@@ -150,7 +153,7 @@ int main(int argc, char *argv[])
 
 	/* Parse args */
 
-	while ((c = getopt(argc, argv, "w:c:r:l:i:m:o:t:0:1:2:3:4:")) != -1) {
+	while ((c = getopt(argc, argv, "w:c:r:l:i:m:o:t:0:1:2:3:4:f:")) != -1) {
 		switch (c) {
 		case 'w':
 			printf("option w with value '%s'\n", optarg);
@@ -212,8 +215,12 @@ int main(int argc, char *argv[])
 			       optarg);
 			rt_limit[4] = atoi(optarg);
 			break;
+		case 'f':
+			printf("option f with value '%s'\n", optarg);
+			dbpath = strdup(optarg);
+			break;
 		case '?':
-			printf("Usage: tpcc_start -w warehouses -c connections -r warmup_time -l running_time -i report_interval\n");
+			printf("Usage: tpcc_start -w warehouses -c connections -r warmup_time -l running_time -i report_interval -f db_file\n");
 			exit(0);
 		default:
 			printf("?? getopt returned character code 0%o ??\n", c);
@@ -225,58 +232,10 @@ int main(int argc, char *argv[])
 			printf("%s ", argv[optind++]);
 		printf("\n");
 	}
-
-	/*
-  if ((num_node == 0)&&(argc == 14)) {
-    valuable_flg = 1;
-  }
-
-  if ((num_node == 0)&&(valuable_flg == 0)&&(argc != 9)) {
-    fprintf(stderr, "\n usage: tpcc_start [server] [DB] [user] [pass] [warehouse] [connection] [rampup] [measure]\n");
-    exit(1);
-  }
-
-  if ( strlen(argv[1]) >= DB_STRING_MAX ) {
-    fprintf(stderr, "\n server phrase is too long\n");
-    exit(1);
-  }
-  if ( strlen(argv[2]) >= DB_STRING_MAX ) {
-    fprintf(stderr, "\n DBname phrase is too long\n");
-    exit(1);
-  }
-  if ( strlen(argv[3]) >= DB_STRING_MAX ) {
-    fprintf(stderr, "\n user phrase is too long\n");
-    exit(1);
-  }
-  if ( strlen(argv[4]) >= DB_STRING_MAX ) {
-    fprintf(stderr, "\n pass phrase is too long\n");
-    exit(1);
-  }
-  if ((num_ware = atoi(argv[5 + arg_offset])) <= 0) {
-    fprintf(stderr, "\n expecting positive number of warehouses\n");
-    exit(1);
-  }
-  if ((num_conn = atoi(argv[6 + arg_offset])) <= 0) {
-    fprintf(stderr, "\n expecting positive number of connections\n");
-    exit(1);
-  }
-  if ((lampup_time = atoi(argv[7 + arg_offset])) < 0) {
-    fprintf(stderr, "\n expecting positive number of lampup_time [sec]\n");
-    exit(1);
-  }
-  if ((measure_time = atoi(argv[8 + arg_offset])) < 0) {
-    fprintf(stderr, "\n expecting positive number of measure_time [sec]\n");
-    exit(1);
-  }
-
-  if (parse_host_get_port(&port, argv[1]) < 0) {
-      fprintf(stderr, "cannot prase the host: %s\n", argv[1]);
-      exit(1);
-  }
-  strcpy( db_string, argv[2] );
-  strcpy( db_user, argv[3] );
-  strcpy( db_password, argv[4] );
-*/
+	if (!dbpath) {
+		printf("DB file (-f) is not provided!\n");
+		exit(-1);
+	}
 
 	if (valuable_flg == 1) {
 		if ((atoi(argv[9 + arg_offset]) < 0) ||
@@ -332,24 +291,7 @@ int main(int argc, char *argv[])
 		exit(1);
 	}
 
-	fd = open("/dev/urandom", O_RDONLY);
-	if (fd == -1) {
-		fd = open("/dev/random", O_RDONLY);
-		if (fd == -1) {
-			struct timeval tv;
-			gettimeofday(&tv, NULL);
-			seed = (tv.tv_sec ^ tv.tv_usec) * tv.tv_sec *
-				       tv.tv_usec ^
-			       tv.tv_sec;
-		} else {
-			read(fd, &seed, sizeof(seed));
-			close(fd);
-		}
-	} else {
-		read(fd, &seed, sizeof(seed));
-		close(fd);
-	}
-	SetSeed(seed);
+	init_randomness();
 
 	if (valuable_flg == 0) {
 		seq_init(10, 10, 1, 1, 1); /* normal ratio */
@@ -404,6 +346,8 @@ int main(int argc, char *argv[])
 
 	/* EXEC SQL WHENEVER SQLERROR GOTO sqlerr; */
 
+	counting_on = 1;
+
 	for (t_num = 0; t_num < num_conn; t_num++) {
 		thd_arg[t_num].number = t_num;
 		pthread_create(&t[t_num], NULL, (void *)thread_main,
@@ -438,7 +382,7 @@ int main(int argc, char *argv[])
 #endif
   }
   */
-	counting_on = 0;
+	counting_on = 1;
 
 #ifndef _SLEEP_ONLY_
 	/* stop timer */
@@ -655,6 +599,45 @@ void alarm_dummy()
 	}
 }
 
+static inline const char *sql_statements[] =
+{
+	"SELECT c_discount, c_last, c_credit, w_tax FROM customer, warehouse WHERE w_id = ? AND c_w_id = w_id AND c_d_id = ? AND c_id = ?",
+	"SELECT d_next_o_id, d_tax FROM district WHERE d_id = ? AND d_w_id = ?",
+	"UPDATE district SET d_next_o_id = ? + 1 WHERE d_id = ? AND d_w_id = ?",
+	"INSERT INTO orders (o_id, o_d_id, o_w_id, o_c_id, o_entry_d, o_ol_cnt, o_all_local) VALUES(?, ?, ?, ?, ?, ?, ?)",
+	"INSERT INTO new_orders (no_o_id, no_d_id, no_w_id) VALUES (?,?,?)",
+	"SELECT i_price, i_name, i_data FROM item WHERE i_id = ?",
+	"SELECT s_quantity, s_data, s_dist_01, s_dist_02, s_dist_03, s_dist_04, s_dist_05, s_dist_06, s_dist_07, s_dist_08, s_dist_09, s_dist_10 FROM stock WHERE s_i_id = ? AND s_w_id = ?",
+	"UPDATE stock SET s_quantity = ? WHERE s_i_id = ? AND s_w_id = ?",
+	"INSERT INTO order_line (ol_o_id, ol_d_id, ol_w_id, ol_number, ol_i_id, ol_supply_w_id, ol_quantity, ol_amount, ol_dist_info) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+	"UPDATE warehouse SET w_ytd = w_ytd + ? WHERE w_id = ?",
+	"SELECT w_street_1, w_street_2, w_city, w_state, w_zip, w_name FROM warehouse WHERE w_id = ?",
+	"UPDATE district SET d_ytd = d_ytd + ? WHERE d_w_id = ? AND d_id = ?",
+	"SELECT d_street_1, d_street_2, d_city, d_state, d_zip, d_name FROM district WHERE d_w_id = ? AND d_id = ?",
+	"SELECT count(c_id) FROM customer WHERE c_w_id = ? AND c_d_id = ? AND c_last = ?",
+	"SELECT c_id FROM customer WHERE c_w_id = ? AND c_d_id = ? AND c_last = ? ORDER BY c_first",
+	"SELECT c_first, c_middle, c_last, c_street_1, c_street_2, c_city, c_state, c_zip, c_phone, c_credit, c_credit_lim, c_discount, c_balance, c_since FROM customer WHERE c_w_id = ? AND c_d_id = ? AND c_id = ?",
+	"SELECT c_data FROM customer WHERE c_w_id = ? AND c_d_id = ? AND c_id = ?",
+	"UPDATE customer SET c_balance = ?, c_data = ? WHERE c_w_id = ? AND c_d_id = ? AND c_id = ?",
+	"UPDATE customer SET c_balance = ? WHERE c_w_id = ? AND c_d_id = ? AND c_id = ?",
+	"INSERT INTO history(h_c_d_id, h_c_w_id, h_c_id, h_d_id, h_w_id, h_date, h_amount, h_data) VALUES(?, ?, ?, ?, ?, ?, ?, ?)",
+	"SELECT count(c_id) FROM customer WHERE c_w_id = ? AND c_d_id = ? AND c_last = ?",
+	"SELECT c_balance, c_first, c_middle, c_last FROM customer WHERE c_w_id = ? AND c_d_id = ? AND c_last = ? ORDER BY c_first",
+	"SELECT c_balance, c_first, c_middle, c_last FROM customer WHERE c_w_id = ? AND c_d_id = ? AND c_id = ?",
+	"SELECT o_id, o_entry_d, COALESCE(o_carrier_id,0) FROM orders WHERE o_w_id = ? AND o_d_id = ? AND o_c_id = ? AND o_id = (SELECT MAX(o_id) FROM orders WHERE o_w_id = ? AND o_d_id = ? AND o_c_id = ?)",
+	"SELECT ol_i_id, ol_supply_w_id, ol_quantity, ol_amount, ol_delivery_d FROM order_line WHERE ol_w_id = ? AND ol_d_id = ? AND ol_o_id = ?",
+	"SELECT COALESCE(MIN(no_o_id),0) FROM new_orders WHERE no_d_id = ? AND no_w_id = ?",
+	"DELETE FROM new_orders WHERE no_o_id = ? AND no_d_id = ? AND no_w_id = ?",
+	"SELECT o_c_id FROM orders WHERE o_id = ? AND o_d_id = ? AND o_w_id = ?",
+	"UPDATE orders SET o_carrier_id = ? WHERE o_id = ? AND o_d_id = ? AND o_w_id = ?",
+	"UPDATE order_line SET ol_delivery_d = ? WHERE ol_o_id = ? AND ol_d_id = ? AND ol_w_id = ?",
+	"SELECT SUM(ol_amount) FROM order_line WHERE ol_o_id = ? AND ol_d_id = ? AND ol_w_id = ?",
+	"UPDATE customer SET c_balance = c_balance + ? , c_delivery_cnt = c_delivery_cnt + 1 WHERE c_id = ? AND c_d_id = ? AND c_w_id = ?",
+	"SELECT d_next_o_id FROM district WHERE d_id = ? AND d_w_id = ?",
+	"SELECT DISTINCT ol_i_id FROM order_line WHERE ol_w_id = ? AND ol_d_id = ? AND ol_o_id < ? AND ol_o_id >= (? - 20)",
+	"SELECT count(*) FROM stock WHERE s_w_id = ? AND s_i_id = ? AND s_quantity < ?",
+};
+
 int thread_main(thread_arg *arg)
 {
 	int t_num = arg->number;
@@ -666,9 +649,12 @@ int thread_main(thread_arg *arg)
 	// printf("Using schema: %s\n", db_string_full);
 
 	/* exec sql connect :connect_string; */
-	printf("%s: opening db, thread id = %lu\n", __func__, pthread_self());
-	sqlite3_open("/mnt/pmem_emul/tpcc.db", &sqlite3_db);
-	printf("%s: opened db, thread id = %lu\n", __func__, pthread_self());
+	printf("%s: opening db=%s, thread id = %lu\n", __func__, dbpath, pthread_self());
+	sqlite3_open(dbpath, &sqlite3_db);
+	if (!sqlite3_db) {
+		printf("%s: Failed to open DB=%s\n", __func__, dbpath);
+	}
+	printf("%s: opened db=%s, thread id = %lu\n", __func__, dbpath, pthread_self());
 
 	sqlite3_exec(sqlite3_db, "PRAGMA journal_mode = WAL;", 0, 0, 0);
 
@@ -679,230 +665,23 @@ int thread_main(thread_arg *arg)
 	ctx[t_num] = sqlite3_db;
 
 	/* Prepare ALL of SQLs */
-	if (sqlite3_prepare_v2(
-		    sqlite3_db,
-		    "SELECT c_discount, c_last, c_credit, w_tax FROM customer, warehouse WHERE w_id = ? AND c_w_id = w_id AND c_d_id = ? AND c_id = ?",
-		    -1, &stmt[t_num][0], NULL) != SQLITE_OK)
-		goto sqlerr;
-
-	if (sqlite3_prepare_v2(
-		    sqlite3_db,
-		    "SELECT d_next_o_id, d_tax FROM district WHERE d_id = ? AND d_w_id = ?",
-		    -1, &stmt[t_num][1], NULL) != SQLITE_OK)
-		goto sqlerr;
-
-	if (sqlite3_prepare_v2(
-		    sqlite3_db,
-		    "UPDATE district SET d_next_o_id = ? + 1 WHERE d_id = ? AND d_w_id = ?",
-		    -1, &stmt[t_num][2], NULL) != SQLITE_OK)
-		goto sqlerr;
-
-	if (sqlite3_prepare_v2(
-		    sqlite3_db,
-		    "INSERT INTO orders (o_id, o_d_id, o_w_id, o_c_id, o_entry_d, o_ol_cnt, o_all_local) VALUES(?, ?, ?, ?, ?, ?, ?)",
-		    -1, &stmt[t_num][3], NULL) != SQLITE_OK)
-		goto sqlerr;
-
-	if (sqlite3_prepare_v2(
-		    sqlite3_db,
-		    "INSERT INTO new_orders (no_o_id, no_d_id, no_w_id) VALUES (?,?,?)",
-		    -1, &stmt[t_num][4], NULL) != SQLITE_OK)
-		goto sqlerr;
-
-	if (sqlite3_prepare_v2(
-		    sqlite3_db,
-		    "SELECT i_price, i_name, i_data FROM item WHERE i_id = ?",
-		    -1, &stmt[t_num][5], NULL) != SQLITE_OK)
-		goto sqlerr;
-
-	if (sqlite3_prepare_v2(
-		    sqlite3_db,
-		    "SELECT s_quantity, s_data, s_dist_01, s_dist_02, s_dist_03, s_dist_04, s_dist_05, s_dist_06, s_dist_07, s_dist_08, s_dist_09, s_dist_10 FROM stock WHERE s_i_id = ? AND s_w_id = ?",
-		    -1, &stmt[t_num][6], NULL) != SQLITE_OK)
-		goto sqlerr;
-
-	if (sqlite3_prepare_v2(
-		    sqlite3_db,
-		    "UPDATE stock SET s_quantity = ? WHERE s_i_id = ? AND s_w_id = ?",
-		    -1, &stmt[t_num][7], NULL) != SQLITE_OK)
-		goto sqlerr;
-
-	if (sqlite3_prepare_v2(
-		    sqlite3_db,
-		    "INSERT INTO order_line (ol_o_id, ol_d_id, ol_w_id, ol_number, ol_i_id, ol_supply_w_id, ol_quantity, ol_amount, ol_dist_info) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
-		    -1, &stmt[t_num][8], NULL) != SQLITE_OK)
-		goto sqlerr;
-
-	if (sqlite3_prepare_v2(
-		    sqlite3_db,
-		    "UPDATE warehouse SET w_ytd = w_ytd + ? WHERE w_id = ?", -1,
-		    &stmt[t_num][9], NULL) != SQLITE_OK)
-		goto sqlerr;
-
-	if (sqlite3_prepare_v2(
-		    sqlite3_db,
-		    "SELECT w_street_1, w_street_2, w_city, w_state, w_zip, w_name FROM warehouse WHERE w_id = ?",
-		    -1, &stmt[t_num][10], NULL) != SQLITE_OK)
-		goto sqlerr;
-
-	if (sqlite3_prepare_v2(
-		    sqlite3_db,
-		    "UPDATE district SET d_ytd = d_ytd + ? WHERE d_w_id = ? AND d_id = ?",
-		    -1, &stmt[t_num][11], NULL) != SQLITE_OK)
-		goto sqlerr;
-
-	if (sqlite3_prepare_v2(
-		    sqlite3_db,
-		    "SELECT d_street_1, d_street_2, d_city, d_state, d_zip, d_name FROM district WHERE d_w_id = ? AND d_id = ?",
-		    -1, &stmt[t_num][12], NULL) != SQLITE_OK)
-		goto sqlerr;
-
-	if (sqlite3_prepare_v2(
-		    sqlite3_db,
-		    "SELECT count(c_id) FROM customer WHERE c_w_id = ? AND c_d_id = ? AND c_last = ?",
-		    -1, &stmt[t_num][13], NULL) != SQLITE_OK)
-		goto sqlerr;
-
-	if (sqlite3_prepare_v2(
-		    sqlite3_db,
-		    "SELECT c_id FROM customer WHERE c_w_id = ? AND c_d_id = ? AND c_last = ? ORDER BY c_first",
-		    -1, &stmt[t_num][14], NULL) != SQLITE_OK)
-		goto sqlerr;
-
-	if (sqlite3_prepare_v2(
-		    sqlite3_db,
-		    "SELECT c_first, c_middle, c_last, c_street_1, c_street_2, c_city, c_state, c_zip, c_phone, c_credit, c_credit_lim, c_discount, c_balance, c_since FROM customer WHERE c_w_id = ? AND c_d_id = ? AND c_id = ?",
-		    -1, &stmt[t_num][15], NULL) != SQLITE_OK)
-		goto sqlerr;
-
-	if (sqlite3_prepare_v2(
-		    sqlite3_db,
-		    "SELECT c_data FROM customer WHERE c_w_id = ? AND c_d_id = ? AND c_id = ?",
-		    -1, &stmt[t_num][16], NULL) != SQLITE_OK)
-		goto sqlerr;
-
-	if (sqlite3_prepare_v2(
-		    sqlite3_db,
-		    "UPDATE customer SET c_balance = ?, c_data = ? WHERE c_w_id = ? AND c_d_id = ? AND c_id = ?",
-		    -1, &stmt[t_num][17], NULL) != SQLITE_OK)
-		goto sqlerr;
-
-	if (sqlite3_prepare_v2(
-		    sqlite3_db,
-		    "UPDATE customer SET c_balance = ? WHERE c_w_id = ? AND c_d_id = ? AND c_id = ?",
-		    -1, &stmt[t_num][18], NULL) != SQLITE_OK)
-		goto sqlerr;
-
-	if (sqlite3_prepare_v2(
-		    sqlite3_db,
-		    "INSERT INTO history(h_c_d_id, h_c_w_id, h_c_id, h_d_id, h_w_id, h_date, h_amount, h_data) VALUES(?, ?, ?, ?, ?, ?, ?, ?)",
-		    -1, &stmt[t_num][19], NULL) != SQLITE_OK)
-		goto sqlerr;
-
-	if (sqlite3_prepare_v2(
-		    sqlite3_db,
-		    "SELECT count(c_id) FROM customer WHERE c_w_id = ? AND c_d_id = ? AND c_last = ?",
-		    -1, &stmt[t_num][20], NULL) != SQLITE_OK)
-		goto sqlerr;
-
-	if (sqlite3_prepare_v2(
-		    sqlite3_db,
-		    "SELECT c_balance, c_first, c_middle, c_last FROM customer WHERE c_w_id = ? AND c_d_id = ? AND c_last = ? ORDER BY c_first",
-		    -1, &stmt[t_num][21], NULL) != SQLITE_OK)
-		goto sqlerr;
-
-	if (sqlite3_prepare_v2(
-		    sqlite3_db,
-		    "SELECT c_balance, c_first, c_middle, c_last FROM customer WHERE c_w_id = ? AND c_d_id = ? AND c_id = ?",
-		    -1, &stmt[t_num][22], NULL) != SQLITE_OK)
-		goto sqlerr;
-
-	if (sqlite3_prepare_v2(
-		    sqlite3_db,
-		    "SELECT o_id, o_entry_d, COALESCE(o_carrier_id,0) FROM orders WHERE o_w_id = ? AND o_d_id = ? AND o_c_id = ? AND o_id = (SELECT MAX(o_id) FROM orders WHERE o_w_id = ? AND o_d_id = ? AND o_c_id = ?)",
-		    -1, &stmt[t_num][23], NULL) != SQLITE_OK)
-		goto sqlerr;
-
-	if (sqlite3_prepare_v2(
-		    sqlite3_db,
-		    "SELECT ol_i_id, ol_supply_w_id, ol_quantity, ol_amount, ol_delivery_d FROM order_line WHERE ol_w_id = ? AND ol_d_id = ? AND ol_o_id = ?",
-		    -1, &stmt[t_num][24], NULL) != SQLITE_OK)
-		goto sqlerr;
-
-	if (sqlite3_prepare_v2(
-		    sqlite3_db,
-		    "SELECT COALESCE(MIN(no_o_id),0) FROM new_orders WHERE no_d_id = ? AND no_w_id = ?",
-		    -1, &stmt[t_num][25], NULL) != SQLITE_OK)
-		goto sqlerr;
-
-	if (sqlite3_prepare_v2(
-		    sqlite3_db,
-		    "DELETE FROM new_orders WHERE no_o_id = ? AND no_d_id = ? AND no_w_id = ?",
-		    -1, &stmt[t_num][26], NULL) != SQLITE_OK)
-		goto sqlerr;
-
-	if (sqlite3_prepare_v2(
-		    sqlite3_db,
-		    "SELECT o_c_id FROM orders WHERE o_id = ? AND o_d_id = ? AND o_w_id = ?",
-		    -1, &stmt[t_num][27], NULL) != SQLITE_OK)
-		goto sqlerr;
-
-	if (sqlite3_prepare_v2(
-		    sqlite3_db,
-		    "UPDATE orders SET o_carrier_id = ? WHERE o_id = ? AND o_d_id = ? AND o_w_id = ?",
-		    -1, &stmt[t_num][28], NULL) != SQLITE_OK)
-		goto sqlerr;
-
-	if (sqlite3_prepare_v2(
-		    sqlite3_db,
-		    "UPDATE order_line SET ol_delivery_d = ? WHERE ol_o_id = ? AND ol_d_id = ? AND ol_w_id = ?",
-		    -1, &stmt[t_num][29], NULL) != SQLITE_OK)
-		goto sqlerr;
-
-	if (sqlite3_prepare_v2(
-		    sqlite3_db,
-		    "SELECT SUM(ol_amount) FROM order_line WHERE ol_o_id = ? AND ol_d_id = ? AND ol_w_id = ?",
-		    -1, &stmt[t_num][30], NULL) != SQLITE_OK)
-		goto sqlerr;
-
-	if (sqlite3_prepare_v2(
-		    sqlite3_db,
-		    "UPDATE customer SET c_balance = c_balance + ? , c_delivery_cnt = c_delivery_cnt + 1 WHERE c_id = ? AND c_d_id = ? AND c_w_id = ?",
-		    -1, &stmt[t_num][31], NULL) != SQLITE_OK)
-		goto sqlerr;
-
-	if (sqlite3_prepare_v2(
-		    sqlite3_db,
-		    "SELECT d_next_o_id FROM district WHERE d_id = ? AND d_w_id = ?",
-		    -1, &stmt[t_num][32], NULL) != SQLITE_OK)
-		goto sqlerr;
-
-	if (sqlite3_prepare_v2(
-		    sqlite3_db,
-		    "SELECT DISTINCT ol_i_id FROM order_line WHERE ol_w_id = ? AND ol_d_id = ? AND ol_o_id < ? AND ol_o_id >= (? - 20)",
-		    -1, &stmt[t_num][33], NULL) != SQLITE_OK)
-		goto sqlerr;
-
-	if (sqlite3_prepare_v2(
-		    sqlite3_db,
-		    "SELECT count(*) FROM stock WHERE s_w_id = ? AND s_i_id = ? AND s_quantity < ?",
-		    -1, &stmt[t_num][34], NULL) != SQLITE_OK)
-		goto sqlerr;
+	for (int i = 0; i < 35; ++i) {
+		if (sqlite3_prepare_v2(sqlite3_db, sql_statements[i], -1, &stmt[t_num][i], NULL) != SQLITE_OK)
+			goto sqlerr;
+	}
 
 	INITIALIZE_TIMERS();
 
 	time_start = clock();
 
 	for (i = 0; i < num_trans; i++) {
-		if (sqlite3_exec(ctx[t_num], "BEGIN TRANSACTION;", NULL, NULL,
-				 NULL) != SQLITE_OK)
+		if (sqlite3_exec(ctx[t_num], "BEGIN TRANSACTION;", NULL, NULL, NULL) != SQLITE_OK)
 			goto sqlerr;
 
 		r = driver(t_num);
 
 		/* EXEC SQL COMMIT WORK; */
-		if (sqlite3_exec(ctx[t_num], "COMMIT;", NULL, NULL, NULL) !=
-		    SQLITE_OK)
+		if (sqlite3_exec(ctx[t_num], "COMMIT;", NULL, NULL, NULL) != SQLITE_OK)
 			goto sqlerr;
 	}
 

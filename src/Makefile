@@ -24,10 +24,10 @@ OBJS=		main.o spt_proc.o driver.o support.o sequence.o rthist.o sb_percentile.o 
 all: ../tpcc_load ../tpcc_start
 
 ../tpcc_load : load.o support.o
-	$(CC) load.o support.o $(LIBS) -o ../tpcc_load
+	$(CC) $(CFLAGS) load.o support.o $(LIBS) -o ../tpcc_load
 
 ../tpcc_start : $(OBJS)
-	$(CC) $(OBJS) $(LIBS) -o ../tpcc_start
+	$(CC) $(CFLAGS) $(OBJS) $(LIBS) -o ../tpcc_start
 
 clean :
 	rm -f *.o

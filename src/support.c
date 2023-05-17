@@ -7,7 +7,10 @@
 #include <stdio.h>
 #include <string.h>
 #include <time.h>
+#include <sys/time.h>
 #include <ctype.h>
+#include <fcntl.h>
+#include <unistd.h>
 
 #include "tpc.h"
 
@@ -17,6 +20,29 @@ static int perm_count;
 void SetSeed(int seed)
 {
 	srand(seed);
+}
+
+void init_randomness()
+{
+	int seed;
+	int fd = open("/dev/urandom", O_RDONLY);
+	if (fd == -1) {
+		fd = open("/dev/random", O_RDONLY);
+		if (fd == -1) {
+			struct timeval tv;
+			gettimeofday(&tv, NULL);
+			seed = (tv.tv_sec ^ tv.tv_usec) * tv.tv_sec *
+				       tv.tv_usec ^
+			       tv.tv_sec;
+		} else {
+			read(fd, &seed, sizeof(seed));
+			close(fd);
+		}
+	} else {
+		read(fd, &seed, sizeof(seed));
+		close(fd);
+	}
+	SetSeed(seed);
 }
 
 /*

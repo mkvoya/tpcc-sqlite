@@ -102,6 +102,8 @@ void New_Orders();
 void MakeAddress();
 void Error();
 
+void init_randomness();
+
 #ifdef __STDC__
 void SetSeed(int seed);
 int RandomNumber(int min, int max);

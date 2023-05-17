@@ -61,8 +61,6 @@ int driver(int t_num)
 		delivery_time, slev_time;
 	/* Actually, WaitTimes are needed... */
 
-	//for (i = 0; i < num_trans; i++) {
-
 	switch (seq_get()) {
 	case 0:
 		START_TIMING(neword_t, neword_time);
@@ -92,10 +90,6 @@ int driver(int t_num)
 	default:
 		printf("Error - Unknown sequence.\n");
 	}
-
-	//PRINT_TIME();
-	//num_trans++;
-	//}
 
 	return (0);
 }

@@ -56,16 +56,32 @@ int try_stmt_execute(sqlite3_stmt *sqlite_stmt)
 	return ret;
 }
 
+
+static inline const char *sql_statements[] =
+{
+	"INSERT INTO item values(?,?,?,?,?)",
+	"INSERT INTO warehouse values(?,?,?,?,?,?,?,?,?)",
+	"INSERT INTO stock values(?,?,?,?,?,?,?,?,?,?,?,?,?,0,0,0,?)",
+	"INSERT INTO district values(?,?,?,?,?,?,?,?,?,?,?)",
+	"INSERT INTO customer values(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?, 10.0, 1, 0,?)",
+	"INSERT INTO history values(?,?,?,?,?,?,?,?)",
+	"INSERT INTO orders values(?,?,?,?,?,NULL,?, 1)",
+	"INSERT INTO new_orders values(?,?,?)",
+	"INSERT INTO orders values(?,?,?,?,?,?,?, 1)",
+	"INSERT INTO order_line values(?,?,?,?,?,?, NULL,?,?,?)",
+	"INSERT INTO order_line values(?,?,?,?,?,?,?,?,?,?)",
+};
+
 /*
  * ==================================================================+ |
  * main() | ARGUMENTS |      Warehouses n [Debug] [Help]
  * +==================================================================
  */
-void main(argc, argv) int argc;
-char *argv[];
+int main(int argc, char *argv[])
 {
 	char arg[2];
 	char *ptr;
+	char *dbpath = NULL;
 
 	int i, c;
 
@@ -80,7 +96,7 @@ char *argv[];
 
 	/* Parse args */
 
-	while ((c = getopt(argc, argv, "w:l:m:n:")) != -1) {
+	while ((c = getopt(argc, argv, "w:l:m:n:f:")) != -1) {
 		switch (c) {
 		case 'w':
 			printf("option w with value '%s'\n", optarg);
@@ -99,8 +115,12 @@ char *argv[];
 			printf("option n with value '%s'\n", optarg);
 			max_ware = atoi(optarg);
 			break;
+		case 'f':
+			printf("option w with value '%s'\n", optarg);
+			dbpath = strdup(optarg);
+			break;
 		case '?':
-			printf("Usage: tpcc_load -w warehouses -m min_wh -n max_wh\n");
+			printf("Usage: tpcc_load -w warehouses -m min_wh -n max_wh -f db_file\n");
 			printf("* [part]: 1=ITEMS 2=WAREHOUSE 3=CUSTOMER 4=ORDERS\n");
 			exit(0);
 		default:
@@ -112,6 +132,10 @@ char *argv[];
 		while (optind < argc)
 			printf("%s ", argv[optind++]);
 		printf("\n");
+	}
+	if (!dbpath) {
+		printf("DB file (-f) is not provided!\n");
+		exit(-1);
 	}
 
 	if (particle_flg == 0) {
@@ -125,31 +149,14 @@ char *argv[];
 		printf("     [MAX WH]: %d\n", max_ware);
 	}
 
-	fd = open("/dev/urandom", O_RDONLY);
-	if (fd == -1) {
-		fd = open("/dev/random", O_RDONLY);
-		if (fd == -1) {
-			struct timeval tv;
-			gettimeofday(&tv, NNULL);
-			seed = (tv.tv_sec ^ tv.tv_usec) * tv.tv_sec *
-				       tv.tv_usec ^
-			       tv.tv_sec;
-		} else {
-			read(fd, &seed, sizeof(seed));
-			close(fd);
-		}
-	} else {
-		read(fd, &seed, sizeof(seed));
-		close(fd);
-	}
-	SetSeed(seed);
+	init_randomness();
 
 	/* Initialize timestamp (for date columns) */
 	gettimestamp(timestamp, STRFTIME_FORMAT, TIMESTAMP_LEN);
 
 	/* EXEC SQL WHENEVER SQLERROR GOTO Error_SqlCall; */
 
-	sqlite3_open("/mnt/pmem_emul/tpcc.db", &sqlite);
+	sqlite3_open(dbpath, &sqlite);
 	if (!sqlite) {
 		printf("%s: Failed to open DB\n", __func__);
 	}
@@ -160,53 +167,10 @@ char *argv[];
 	    if(!stmt[i]) goto Error_SqlCall_close;
     }
     */
-	if (sqlite3_prepare_v2(sqlite, "INSERT INTO item values(?,?,?,?,?)", -1,
-			       &stmt[0], NULL) != SQLITE_OK)
-		goto Error_SqlCall_close;
-	if (sqlite3_prepare_v2(
-		    sqlite, "INSERT INTO warehouse values(?,?,?,?,?,?,?,?,?)",
-		    -1, &stmt[1], NULL) != SQLITE_OK)
-		goto Error_SqlCall_close;
-	if (sqlite3_prepare_v2(
-		    sqlite,
-		    "INSERT INTO stock values(?,?,?,?,?,?,?,?,?,?,?,?,?,0,0,0,?)",
-		    -1, &stmt[2], NULL) != SQLITE_OK)
-		goto Error_SqlCall_close;
-	if (sqlite3_prepare_v2(
-		    sqlite,
-		    "INSERT INTO district values(?,?,?,?,?,?,?,?,?,?,?)", -1,
-		    &stmt[3], NULL) != SQLITE_OK)
-		goto Error_SqlCall_close;
-	if (sqlite3_prepare_v2(
-		    sqlite,
-		    "INSERT INTO customer values(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?, 10.0, 1, 0,?)",
-		    -1, &stmt[4], NULL) != SQLITE_OK)
-		goto Error_SqlCall_close;
-	if (sqlite3_prepare_v2(sqlite,
-			       "INSERT INTO history values(?,?,?,?,?,?,?,?)",
-			       -1, &stmt[5], NULL) != SQLITE_OK)
-		goto Error_SqlCall_close;
-	if (sqlite3_prepare_v2(sqlite,
-			       "INSERT INTO orders values(?,?,?,?,?,NULL,?, 1)",
-			       -1, &stmt[6], NULL) != SQLITE_OK)
-		goto Error_SqlCall_close;
-	if (sqlite3_prepare_v2(sqlite, "INSERT INTO new_orders values(?,?,?)",
-			       -1, &stmt[7], NULL) != SQLITE_OK)
-		goto Error_SqlCall_close;
-	if (sqlite3_prepare_v2(sqlite,
-			       "INSERT INTO orders values(?,?,?,?,?,?,?, 1)",
-			       -1, &stmt[8], NULL) != SQLITE_OK)
-		goto Error_SqlCall_close;
-	if (sqlite3_prepare_v2(
-		    sqlite,
-		    "INSERT INTO order_line values(?,?,?,?,?,?, NULL,?,?,?)",
-		    -1, &stmt[9], NULL) != SQLITE_OK)
-		goto Error_SqlCall_close;
-	if (sqlite3_prepare_v2(
-		    sqlite,
-		    "INSERT INTO order_line values(?,?,?,?,?,?,?,?,?,?)", -1,
-		    &stmt[10], NULL) != SQLITE_OK)
-		goto Error_SqlCall_close;
+	for (int i = 0; i < 11; ++i) {
+		if (sqlite3_prepare_v2(sqlite, sql_statements[i], -1, &stmt[i], NULL) != SQLITE_OK)
+			goto Error_SqlCall_close;
+	}
 
 	/* exec sql begin transaction; */
 
@@ -255,6 +219,7 @@ char *argv[];
 Error_SqlCall_close:
 Error_SqlCall:
 	Error(0);
+        return 0;
 }
 
 /*
