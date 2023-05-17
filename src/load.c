@@ -1048,7 +1048,7 @@ retry:
 				/*EXEC SQL INSERT INTO
 				    order_line
 				    values(:o_id,:o_d_id,:o_w_id,:ol,
-					   :ol_i_id,:ol_supply_w_id, 
+					   :ol_i_id,:ol_supply_w_id,
 					   :timestamp,
 					   :ol_quantity,:ol_amount,:ol_dist_info);*/
 

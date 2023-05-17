@@ -161,7 +161,7 @@ int GetPermutation(void)
  |      Lastname
  | DESCRIPTION
  |      TPC-C Lastname Function.
- | ARGUMENTS 
+ | ARGUMENTS
  |      num  - non-uniform random number
  |      name - last name string
  +==================================================================*/

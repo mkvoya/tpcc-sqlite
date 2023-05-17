@@ -1,6 +1,6 @@
 /*
  * -*-C-*-
- * slev.pc 
+ * slev.pc
  * corresponds to A.5 in appendix A
  */
 

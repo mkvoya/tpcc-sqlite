@@ -17,7 +17,7 @@ extern "C" {
 /*
  */
 
-/* 
+/*
  * small values
 
 #define MAXITEMS 	1000

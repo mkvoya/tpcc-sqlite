@@ -1,6 +1,6 @@
 /*
- * -*-C-*- 
- * ordstat.pc 
+ * -*-C-*-
+ * ordstat.pc
  * corresponds to A.3 in appendix A
  */
 

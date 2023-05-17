@@ -1,6 +1,6 @@
 /*
- * -*-C-*-  
- * payment.pc 
+ * -*-C-*-
+ * payment.pc
  * corresponds to A.2 in appendix A
  */
 
@@ -125,7 +125,7 @@ int payment(int t_num, int w_id_arg, /* warehouse id */
 	sqlite3_reset(sqlite_stmt);
 	proceed = 3;
 	/*EXEC_SQL UPDATE district SET d_ytd = d_ytd + :h_amount
-			WHERE d_w_id = :w_id 
+			WHERE d_w_id = :w_id
 			AND d_id = :d_id;*/
 
 	sqlite_stmt = stmt[t_num][11];
@@ -144,7 +144,7 @@ int payment(int t_num, int w_id_arg, /* warehouse id */
 	                INTO :d_street_1, :d_street_2, :d_city, :d_state,
 				:d_zip, :d_name
 	                FROM district
-	                WHERE d_w_id = :w_id 
+	                WHERE d_w_id = :w_id
 			AND d_id = :d_id;*/
 
 	sqlite_stmt = stmt[t_num][12];
@@ -174,7 +174,7 @@ int payment(int t_num, int w_id_arg, /* warehouse id */
 		strcpy(c_last, c_last_arg);
 
 		proceed = 5;
-		/*EXEC_SQL SELECT count(c_id) 
+		/*EXEC_SQL SELECT count(c_id)
 			INTO :namecnt
 		        FROM customer
 			WHERE c_w_id = :c_w_id
@@ -203,8 +203,8 @@ int payment(int t_num, int w_id_arg, /* warehouse id */
 		/*EXEC_SQL DECLARE c_byname_p CURSOR FOR
 		        SELECT c_id
 		        FROM customer
-		        WHERE c_w_id = :c_w_id 
-			AND c_d_id = :c_d_id 
+		        WHERE c_w_id = :c_w_id
+			AND c_d_id = :c_d_id
 			AND c_last = :c_last
 			ORDER BY c_first;
 
@@ -245,8 +245,8 @@ int payment(int t_num, int w_id_arg, /* warehouse id */
 		     :c_credit, :c_credit_lim, :c_discount, :c_balance,
 		     :c_since
 		FROM customer
-	        WHERE c_w_id = :c_w_id 
-	        AND c_d_id = :c_d_id 
+	        WHERE c_w_id = :c_w_id
+	        AND c_d_id = :c_d_id
 		AND c_id = :c_id
 		FOR UPDATE;*/
 
@@ -286,11 +286,11 @@ int payment(int t_num, int w_id_arg, /* warehouse id */
 	c_credit[2] = '\0';
 	if (strstr(c_credit, "BC")) {
 		proceed = 7;
-		/*EXEC_SQL SELECT c_data 
+		/*EXEC_SQL SELECT c_data
 			INTO :c_data
 		        FROM customer
-		        WHERE c_w_id = :c_w_id 
-			AND c_d_id = :c_d_id 
+		        WHERE c_w_id = :c_w_id
+			AND c_d_id = :c_d_id
 			AND c_id = :c_id; */
 
 		sqlite_stmt = stmt[t_num][16];
@@ -323,8 +323,8 @@ int payment(int t_num, int w_id_arg, /* warehouse id */
 		proceed = 8;
 		/*EXEC_SQL UPDATE customer
 			SET c_balance = :c_balance, c_data = :c_new_data
-			WHERE c_w_id = :c_w_id 
-			AND c_d_id = :c_d_id 
+			WHERE c_w_id = :c_w_id
+			AND c_d_id = :c_d_id
 			AND c_id = :c_id;*/
 
 		sqlite_stmt = stmt[t_num][17];
@@ -342,10 +342,10 @@ int payment(int t_num, int w_id_arg, /* warehouse id */
 
 	} else {
 		proceed = 9;
-		/*EXEC_SQL UPDATE customer 
+		/*EXEC_SQL UPDATE customer
 			SET c_balance = :c_balance
-			WHERE c_w_id = :c_w_id 
-			AND c_d_id = :c_d_id 
+			WHERE c_w_id = :c_w_id
+			AND c_d_id = :c_d_id
 			AND c_id = :c_id;*/
 
 		sqlite_stmt = stmt[t_num][18];
@@ -374,7 +374,7 @@ int payment(int t_num, int w_id_arg, /* warehouse id */
 	/*EXEC_SQL INSERT INTO history(h_c_d_id, h_c_w_id, h_c_id, h_d_id,
 			                   h_w_id, h_date, h_amount, h_data)
 	                VALUES(:c_d_id, :c_w_id, :c_id, :d_id,
-		               :w_id, 
+		               :w_id,
 			       :datetime,
 			       :h_amount, :h_data);*/
 

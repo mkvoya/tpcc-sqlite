@@ -1,6 +1,6 @@
 /*
- * -*-C-*- 
- * neword.pc 
+ * -*-C-*-
+ * neword.pc
  * corresponds to A.1 in appendix A
  */
 
@@ -131,9 +131,9 @@ int neword(int t_num, int w_id_arg, /* warehouse id */
 	/*EXEC_SQL SELECT c_discount, c_last, c_credit, w_tax
 		INTO :c_discount, :c_last, :c_credit, :w_tax
 	        FROM customer, warehouse
-	        WHERE w_id = :w_id 
-		AND c_w_id = w_id 
-		AND c_d_id = :d_id 
+	        WHERE w_id = :w_id
+		AND c_w_id = w_id
+		AND c_d_id = :d_id
 		AND c_id = :c_id;*/
 	sqlite_stmt = stmt[t_num][0];
 
@@ -189,7 +189,7 @@ int neword(int t_num, int w_id_arg, /* warehouse id */
 
 	proceed = 3;
 	/*EXEC_SQL UPDATE district SET d_next_o_id = :d_next_o_id + 1
-	        WHERE d_id = :d_id 
+	        WHERE d_id = :d_id
 		AND d_w_id = :w_id;*/
 
 	sqlite_stmt = stmt[t_num][2];
@@ -212,7 +212,7 @@ int neword(int t_num, int w_id_arg, /* warehouse id */
 	proceed = 4;
 	/*EXEC_SQL INSERT INTO orders (o_id, o_d_id, o_w_id, o_c_id,
 			             o_entry_d, o_ol_cnt, o_all_local)
-		VALUES(:o_id, :d_id, :w_id, :c_id, 
+		VALUES(:o_id, :d_id, :w_id, :c_id,
 		       :datetime,
                        :o_ol_cnt, :o_all_local);*/
 
@@ -321,7 +321,7 @@ int neword(int t_num, int w_id_arg, /* warehouse id */
 		             :s_dist_03, :s_dist_04, :s_dist_05, :s_dist_06,
 		             :s_dist_07, :s_dist_08, :s_dist_09, :s_dist_10
 		        FROM stock
-		        WHERE s_i_id = :ol_i_id 
+		        WHERE s_i_id = :ol_i_id
 			AND s_w_id = :ol_supply_w_id
 			FOR UPDATE;*/
 
@@ -376,7 +376,7 @@ int neword(int t_num, int w_id_arg, /* warehouse id */
 
 		proceed = 8;
 		/*EXEC_SQL UPDATE stock SET s_quantity = :s_quantity
-		        WHERE s_i_id = :ol_i_id 
+		        WHERE s_i_id = :ol_i_id
 			AND s_w_id = :ol_supply_w_id;*/
 
 		sqlite_stmt = stmt[t_num][7];
@@ -400,9 +400,9 @@ int neword(int t_num, int w_id_arg, /* warehouse id */
 #endif
 
 		proceed = 9;
-		/*EXEC_SQL INSERT INTO order_line (ol_o_id, ol_d_id, ol_w_id, 
-						 ol_number, ol_i_id, 
-						 ol_supply_w_id, ol_quantity, 
+		/*EXEC_SQL INSERT INTO order_line (ol_o_id, ol_d_id, ol_w_id,
+						 ol_number, ol_i_id,
+						 ol_supply_w_id, ol_quantity,
 						 ol_amount, ol_dist_info)
 			VALUES (:o_id, :d_id, :w_id, :ol_number, :ol_i_id,
 				:ol_supply_w_id, :ol_quantity, :ol_amount,

@@ -227,7 +227,7 @@ int main(int argc, char *argv[])
 	}
 
 	/*
-  if ((num_node == 0)&&(argc == 14)) { 
+  if ((num_node == 0)&&(argc == 14)) {
     valuable_flg = 1;
   }
 
@@ -429,7 +429,7 @@ int main(int argc, char *argv[])
 	/* wait signal */
 	/*
   for(i = 0; i < (measure_time / PRINT_INTERVAL); i++ ) {
-  //while (activate_transaction) {	  
+  //while (activate_transaction) {
 #ifndef _SLEEP_ONLY_
     pause();
 #else

@@ -431,7 +431,7 @@ static int do_delivery(int t_num)
 	return (0);
 }
 
-/* 
+/*
  * prepare data and execute the stock level transaction
  */
 static int do_slev(int t_num)
