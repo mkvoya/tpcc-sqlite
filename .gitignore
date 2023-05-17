@@ -4,3 +4,5 @@ tpcc.db
 /tpcc_load
 /tpcc_start
 *.o
+*.db-shm
+*.db-wal
