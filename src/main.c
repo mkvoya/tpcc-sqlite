@@ -31,7 +31,7 @@ int measure_time;
 int num_node; /* number of servers that consists of cluster i.e. RAC (0:normal mode)*/
 #define NUM_NODE_MAX 8
 int time_count;
-int PRINT_INTERVAL = 10;
+int PRINT_INTERVAL = 5;
 int multi_schema = 0;
 int multi_schema_offset = 0;
 
@@ -169,7 +169,7 @@ int main(int argc, char *argv[])
 	/* dummy initialize*/
 	num_ware = 1;
 	num_conn = 10;
-	lampup_time = 10;
+	lampup_time = 5;
 	measure_time = 20;
 	num_trans = 10000;
 
@@ -344,7 +344,7 @@ int main(int argc, char *argv[])
 
 	/* EXEC SQL WHENEVER SQLERROR GOTO sqlerr; */
 
-	counting_on = 1;
+	counting_on = 0;
 
 	for (t_num = 0; t_num < num_conn; t_num++) {
 		thread_arg *arg = &thd_arg[t_num];
@@ -368,11 +368,11 @@ int main(int argc, char *argv[])
 	/* sleep(measure_time); */
 	/* start timer */
 
-#ifndef _SLEEP_ONLY_
-	if (setitimer(ITIMER_REAL, &itval, NULL) == -1) {
-		fprintf(stderr, "error in setitimer()\n");
-	}
-#endif
+// #ifndef _SLEEP_ONLY_
+// 	if (setitimer(ITIMER_REAL, &itval, NULL) == -1) {
+// 		fprintf(stderr, "error in setitimer()\n");
+// 	}
+// #endif
 
 	counting_on = 1;
 	/* wait signal */
@@ -387,18 +387,23 @@ int main(int argc, char *argv[])
 #endif
   }
   */
-	counting_on = 1;
-
-#ifndef _SLEEP_ONLY_
-	/* stop timer */
-	itval.it_interval.tv_sec = 0;
-	itval.it_interval.tv_usec = 0;
-	itval.it_value.tv_sec = 0;
-	itval.it_value.tv_usec = 0;
-	if (setitimer(ITIMER_REAL, &itval, NULL) == -1) {
-		fprintf(stderr, "error in setitimer()\n");
+	for (int i = 0; i < (measure_time / PRINT_INTERVAL); ++i) {
+		sleep(PRINT_INTERVAL);
+		alarm_dummy();
 	}
-#endif
+	// sleep(measure_time);
+	counting_on = 0;
+
+// #ifndef _SLEEP_ONLY_
+// 	/* stop timer */
+// 	itval.it_interval.tv_sec = 0;
+// 	itval.it_interval.tv_usec = 0;
+// 	itval.it_value.tv_sec = 0;
+// 	itval.it_value.tv_usec = 0;
+// 	if (setitimer(ITIMER_REAL, &itval, NULL) == -1) {
+// 		fprintf(stderr, "error in setitimer()\n");
+// 	}
+// #endif
 
 	printf("\nSTOPPING THREADS");
 	activate_transaction = 0;
