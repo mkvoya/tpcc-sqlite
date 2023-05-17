@@ -6,3 +6,4 @@ tpcc.db
 *.o
 *.db-shm
 *.db-wal
+/.tags
