@@ -11,14 +11,13 @@
 
 #include "spt_proc.h"
 #include "tpc.h"
-
-extern sqlite3 **ctx;
-extern sqlite3_stmt ***stmt;
+#include "main.h"
 
 /*
  * the order status transaction
  */
-int ordstat(int t_num, int w_id_arg, /* warehouse id */
+int ordstat(int t_num, thread_arg *arg,
+	    int w_id_arg, /* warehouse id */
 	    int d_id_arg, /* district id */
 	    int byname, /* select by c_id or c_last? */
 	    int c_id_arg, /* customer id */
@@ -65,7 +64,7 @@ int ordstat(int t_num, int w_id_arg, /* warehouse id */
 			AND c_d_id = :c_d_id
 		        AND c_last = :c_last;*/
 
-		sqlite_stmt = stmt[t_num][20];
+		sqlite_stmt = arg->stmt[20];
 
 		sqlite3_bind_int64(sqlite_stmt, 1, c_w_id);
 		sqlite3_bind_int64(sqlite_stmt, 2, c_d_id);
@@ -95,7 +94,7 @@ int ordstat(int t_num, int w_id_arg, /* warehouse id */
 		proceed = 3;
 		EXEC_SQL OPEN c_byname_o;*/
 
-		sqlite_stmt = stmt[t_num][21];
+		sqlite_stmt = arg->stmt[21];
 
 		sqlite3_bind_int64(sqlite_stmt, 1, c_w_id);
 		sqlite3_bind_int64(sqlite_stmt, 2, c_d_id);
@@ -137,7 +136,7 @@ int ordstat(int t_num, int w_id_arg, /* warehouse id */
 			AND c_d_id = :c_d_id
 			AND c_id = :c_id;*/
 
-		sqlite_stmt = stmt[t_num][22];
+		sqlite_stmt = arg->stmt[22];
 
 		sqlite3_bind_int64(sqlite_stmt, 1, c_w_id);
 		sqlite3_bind_int64(sqlite_stmt, 2, c_d_id);
@@ -175,7 +174,7 @@ int ordstat(int t_num, int w_id_arg, /* warehouse id */
 		  	    AND o_d_id = :c_d_id
 		    	    AND o_c_id = :c_id);*/
 
-	sqlite_stmt = stmt[t_num][23];
+	sqlite_stmt = arg->stmt[23];
 
 	sqlite3_bind_int64(sqlite_stmt, 1, c_w_id);
 	sqlite3_bind_int64(sqlite_stmt, 2, c_d_id);
@@ -209,7 +208,7 @@ int ordstat(int t_num, int w_id_arg, /* warehouse id */
 		AND ol_d_id = :c_d_id
 		AND ol_o_id = :o_id;*/
 
-	sqlite_stmt = stmt[t_num][24];
+	sqlite_stmt = arg->stmt[24];
 
 	sqlite3_bind_int64(sqlite_stmt, 1, c_w_id);
 	sqlite3_bind_int64(sqlite_stmt, 2, c_d_id);
@@ -255,12 +254,12 @@ done:
 
 sqlerr:
 	fprintf(stderr, "ordstat %d:%d\n", t_num, proceed);
-	printf("%s: error: %s\n", __func__, sqlite3_errmsg(ctx[t_num]));
+	printf("%s: error: %s\n", __func__, sqlite3_errmsg(arg->ctx));
 
 	//error(ctx[t_num],mysql_stmt);
 	/*EXEC SQL WHENEVER SQLERROR GOTO sqlerrerr;*/
 	/*EXEC_SQL ROLLBACK WORK;*/
-	sqlite3_exec(ctx[t_num], "ROLLBACK;", NULL, NULL, NULL);
+	sqlite3_exec(arg->ctx, "ROLLBACK;", NULL, NULL, NULL);
 sqlerrerr:
 	return (0);
 }

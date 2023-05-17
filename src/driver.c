@@ -14,12 +14,14 @@
 #include "sb_percentile.h"
 #include <sqlite3.h>
 
+#include "main.h"
+
 static int other_ware(int home_ware);
-static int do_neword(int t_num);
-static int do_payment(int t_num);
-static int do_ordstat(int t_num);
-static int do_delivery(int t_num);
-static int do_slev(int t_num);
+static int do_neword(int t_num, thread_arg *arg);
+static int do_payment(int t_num, thread_arg *arg);
+static int do_ordstat(int t_num, thread_arg *arg);
+static int do_delivery(int t_num, thread_arg *arg);
+static int do_slev(int t_num, thread_arg *arg);
 
 extern sqlite3 **ctx;
 extern int num_ware;
@@ -34,16 +36,6 @@ extern int num_node;
 extern int time_count;
 extern FILE *freport_file;
 
-extern int success[];
-extern int late[];
-extern int retry[];
-extern int failure[];
-
-extern int *success2[];
-extern int *late2[];
-extern int *retry2[];
-extern int *failure2[];
-
 extern double max_rt[];
 extern double total_rt[];
 
@@ -54,7 +46,58 @@ extern sb_percentile_t local_percentile;
 
 #define MAX_RETRY 2000
 
-int driver(int t_num)
+static inline void inc_success(enum tx_type tx, thread_arg *arg)
+{
+	g_stats.stat[tx].success++;
+	arg->stats.stat[tx].success++;
+}
+
+static inline void inc_late(enum tx_type tx, thread_arg *arg)
+{
+	g_stats.stat[tx].late++;
+	arg->stats.stat[tx].late++;
+}
+
+static inline void inc_retry(enum tx_type tx, thread_arg *arg)
+{
+	g_stats.stat[tx].retry++;
+	arg->stats.stat[tx].retry++;
+}
+
+static inline void inc_failure(enum tx_type tx, thread_arg *arg)
+{
+	g_stats.stat[tx].retry--;
+	arg->stats.stat[tx].retry--;
+	g_stats.stat[tx].failure++;
+	arg->stats.stat[tx].failure++;
+}
+
+static void update_on_success(enum tx_type tx, thread_arg *arg,
+			      struct timespec *tbuf1,
+			      struct timespec *tbuf2)
+{
+	double rt = (double)(tbuf2->tv_sec * 1000.0 +
+			     tbuf2->tv_nsec / 1000000.0 -
+			     tbuf1->tv_sec * 1000.0 -
+			     tbuf1->tv_nsec / 1000000.0);
+	//printf("NOT : %.3f\n", rt);
+
+	if (rt > max_rt[tx])
+		max_rt[tx] = rt;
+	total_rt[tx] += rt;
+	sb_percentile_update(&local_percentile, rt);
+	hist_inc(tx, rt);
+	if (counting_on) {
+		if (rt < rt_limit[tx]) {
+			inc_success(tx, arg);
+		} else {
+			inc_late(tx, arg);
+		}
+	}
+}
+
+
+int driver(int t_num, thread_arg *arg)
 {
 	int i, j;
 	instrumentation_type neword_time, payment_time, ordstat_time,
@@ -64,27 +107,27 @@ int driver(int t_num)
 	switch (seq_get()) {
 	case 0:
 		START_TIMING(neword_t, neword_time);
-		do_neword(t_num);
+		do_neword(t_num, arg);
 		END_TIMING(neword_t, neword_time);
 		break;
 	case 1:
 		START_TIMING(payment_t, payment_time);
-		do_payment(t_num);
+		do_payment(t_num, arg);
 		END_TIMING(payment_t, payment_time);
 		break;
 	case 2:
 		START_TIMING(ordstat_t, ordstat_time);
-		do_ordstat(t_num);
+		do_ordstat(t_num, arg);
 		END_TIMING(ordstat_t, ordstat_time);
 		break;
 	case 3:
 		START_TIMING(delivery_t, delivery_time);
-		do_delivery(t_num);
+		do_delivery(t_num, arg);
 		END_TIMING(delivery_t, delivery_time);
 		break;
 	case 4:
 		START_TIMING(slev_t, slev_time);
-		do_slev(t_num);
+		do_slev(t_num, arg);
 		END_TIMING(slev_t, slev_time);
 		break;
 	default:
@@ -98,7 +141,7 @@ int driver(int t_num)
  * prepare data and execute the new order transaction for one order
  * officially, this is supposed to be simulated terminal I/O
  */
-static int do_neword(int t_num)
+static int do_neword(int t_num, thread_arg *arg)
 {
 	int c_num;
 	int i, ret;
@@ -145,46 +188,22 @@ static int do_neword(int t_num)
 
 	clk1 = clock_gettime(CLOCK_MONOTONIC, &tbuf1);
 	for (i = 0; i < MAX_RETRY; i++) {
-		ret = neword(t_num, w_id, d_id, c_id, ol_cnt, all_local, itemid,
+		ret = neword(t_num, arg, w_id, d_id, c_id, ol_cnt, all_local, itemid,
 			     supware, qty);
 		clk2 = clock_gettime(CLOCK_MONOTONIC, &tbuf2);
 
 		if (ret) {
-			rt = (double)(tbuf2.tv_sec * 1000.0 +
-				      tbuf2.tv_nsec / 1000000.0 -
-				      tbuf1.tv_sec * 1000.0 -
-				      tbuf1.tv_nsec / 1000000.0);
-			//printf("NOT : %.3f\n", rt);
-
-			if (rt > max_rt[0])
-				max_rt[0] = rt;
-			total_rt[0] += rt;
-			sb_percentile_update(&local_percentile, rt);
-			hist_inc(0, rt);
-			if (counting_on) {
-				if (rt < rt_limit[0]) {
-					success[0]++;
-					success2[0][t_num]++;
-				} else {
-					late[0]++;
-					late2[0][t_num]++;
-				}
-			}
-
+			update_on_success(0, arg, &tbuf1, &tbuf2);
 			return (1); /* end */
 		} else {
 			if (counting_on) {
-				retry[0]++;
-				retry2[0][t_num]++;
+				inc_retry(0, arg);
 			}
 		}
 	}
 
 	if (counting_on) {
-		retry[0]--;
-		retry2[0][t_num]--;
-		failure[0]++;
-		failure2[0][t_num]++;
+		inc_failure(0, arg);
 	}
 
 	return (0);
@@ -208,7 +227,7 @@ static int other_ware(int home_ware)
 /*
  * prepare data and execute payment transaction
  */
-static int do_payment(int t_num)
+static int do_payment(int t_num, thread_arg *arg)
 {
 	int c_num;
 	int byname, i, ret;
@@ -245,43 +264,23 @@ static int do_payment(int t_num)
 
 	clk1 = clock_gettime(CLOCK_MONOTONIC, &tbuf1);
 	for (i = 0; i < MAX_RETRY; i++) {
-		ret = payment(t_num, w_id, d_id, byname, c_w_id, c_d_id, c_id,
+		ret = payment(t_num, arg, w_id, d_id, byname, c_w_id, c_d_id, c_id,
 			      c_last, h_amount);
 		clk2 = clock_gettime(CLOCK_MONOTONIC, &tbuf2);
 
 		if (ret) {
-			rt = (double)(tbuf2.tv_sec * 1000.0 +
-				      tbuf2.tv_nsec / 1000000.0 -
-				      tbuf1.tv_sec * 1000.0 -
-				      tbuf1.tv_nsec / 1000000.0);
-			if (rt > max_rt[1])
-				max_rt[1] = rt;
-			total_rt[1] += rt;
-			hist_inc(1, rt);
-			if (counting_on) {
-				if (rt < rt_limit[1]) {
-					success[1]++;
-					success2[1][t_num]++;
-				} else {
-					late[1]++;
-					late2[1][t_num]++;
-				}
-			}
+			update_on_success(1, arg, &tbuf1, &tbuf2);
 
 			return (1); /* end */
 		} else {
 			if (counting_on) {
-				retry[1]++;
-				retry2[1][t_num]++;
+				inc_retry(1, arg);
 			}
 		}
 	}
 
 	if (counting_on) {
-		retry[1]--;
-		retry2[1][t_num]--;
-		failure[1]++;
-		failure2[1][t_num]++;
+		inc_failure(1, arg);
 	}
 
 	return (0);
@@ -290,7 +289,7 @@ static int do_payment(int t_num)
 /*
  * prepare data and execute order status transaction
  */
-static int do_ordstat(int t_num)
+static int do_ordstat(int t_num, thread_arg *arg)
 {
 	int c_num;
 	int byname, i, ret;
@@ -319,42 +318,22 @@ static int do_ordstat(int t_num)
 
 	clk1 = clock_gettime(CLOCK_MONOTONIC, &tbuf1);
 	for (i = 0; i < MAX_RETRY; i++) {
-		ret = ordstat(t_num, w_id, d_id, byname, c_id, c_last);
+		ret = ordstat(t_num, arg, w_id, d_id, byname, c_id, c_last);
 		clk2 = clock_gettime(CLOCK_MONOTONIC, &tbuf2);
 
 		if (ret) {
-			rt = (double)(tbuf2.tv_sec * 1000.0 +
-				      tbuf2.tv_nsec / 1000000.0 -
-				      tbuf1.tv_sec * 1000.0 -
-				      tbuf1.tv_nsec / 1000000.0);
-			if (rt > max_rt[2])
-				max_rt[2] = rt;
-			total_rt[2] += rt;
-			hist_inc(2, rt);
-			if (counting_on) {
-				if (rt < rt_limit[2]) {
-					success[2]++;
-					success2[2][t_num]++;
-				} else {
-					late[2]++;
-					late2[2][t_num]++;
-				}
-			}
+			update_on_success(2, arg, &tbuf1, &tbuf2);
 
 			return (1); /* end */
 		} else {
 			if (counting_on) {
-				retry[2]++;
-				retry2[2][t_num]++;
+				inc_retry(2, arg);
 			}
 		}
 	}
 
 	if (counting_on) {
-		retry[2]--;
-		retry2[2][t_num]--;
-		failure[2]++;
-		failure2[2][t_num]++;
+		inc_failure(2, arg);
 	}
 
 	return (0);
@@ -363,7 +342,7 @@ static int do_ordstat(int t_num)
 /*
  * execute delivery transaction
  */
-static int do_delivery(int t_num)
+static int do_delivery(int t_num, thread_arg *arg)
 {
 	int c_num;
 	int i, ret;
@@ -384,42 +363,21 @@ static int do_delivery(int t_num)
 
 	clk1 = clock_gettime(CLOCK_MONOTONIC, &tbuf1);
 	for (i = 0; i < MAX_RETRY; i++) {
-		ret = delivery(t_num, w_id, o_carrier_id);
+		ret = delivery(t_num, arg, w_id, o_carrier_id);
 		clk2 = clock_gettime(CLOCK_MONOTONIC, &tbuf2);
 
 		if (ret) {
-			rt = (double)(tbuf2.tv_sec * 1000.0 +
-				      tbuf2.tv_nsec / 1000000.0 -
-				      tbuf1.tv_sec * 1000.0 -
-				      tbuf1.tv_nsec / 1000000.0);
-			if (rt > max_rt[3])
-				max_rt[3] = rt;
-			total_rt[3] += rt;
-			hist_inc(3, rt);
-			if (counting_on) {
-				if (rt < rt_limit[3]) {
-					success[3]++;
-					success2[3][t_num]++;
-				} else {
-					late[3]++;
-					late2[3][t_num]++;
-				}
-			}
-
+			update_on_success(3, arg, &tbuf1, &tbuf2);
 			return (1); /* end */
 		} else {
 			if (counting_on) {
-				retry[3]++;
-				retry2[3][t_num]++;
+				inc_retry(3, arg);
 			}
 		}
 	}
 
 	if (counting_on) {
-		retry[3]--;
-		retry2[3][t_num]--;
-		failure[3]++;
-		failure2[3][t_num]++;
+		inc_failure(3, arg);
 	}
 
 	return (0);
@@ -428,7 +386,7 @@ static int do_delivery(int t_num)
 /*
  * prepare data and execute the stock level transaction
  */
-static int do_slev(int t_num)
+static int do_slev(int t_num, thread_arg *arg)
 {
 	int c_num;
 	int i, ret;
@@ -450,42 +408,21 @@ static int do_slev(int t_num)
 
 	clk1 = clock_gettime(CLOCK_MONOTONIC, &tbuf1);
 	for (i = 0; i < MAX_RETRY; i++) {
-		ret = slev(t_num, w_id, d_id, level);
+		ret = slev(t_num, arg, w_id, d_id, level);
 		clk2 = clock_gettime(CLOCK_MONOTONIC, &tbuf2);
 
 		if (ret) {
-			rt = (double)(tbuf2.tv_sec * 1000.0 +
-				      tbuf2.tv_nsec / 1000000.0 -
-				      tbuf1.tv_sec * 1000.0 -
-				      tbuf1.tv_nsec / 1000000.0);
-			if (rt > max_rt[4])
-				max_rt[4] = rt;
-			total_rt[4] += rt;
-			hist_inc(4, rt);
-			if (counting_on) {
-				if (rt < rt_limit[4]) {
-					success[4]++;
-					success2[4][t_num]++;
-				} else {
-					late[4]++;
-					late2[4][t_num]++;
-				}
-			}
-
+			update_on_success(4, arg, &tbuf1, &tbuf2);
 			return (1); /* end */
 		} else {
 			if (counting_on) {
-				retry[4]++;
-				retry2[4][t_num]++;
+				inc_retry(4, arg);
 			}
 		}
 	}
 
 	if (counting_on) {
-		retry[4]--;
-		retry2[4][t_num]--;
-		failure[4]++;
-		failure2[4][t_num]++;
+		inc_failure(4, arg);
 	}
 
 	return (0);

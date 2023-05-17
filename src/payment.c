@@ -12,16 +12,13 @@
 
 #include "spt_proc.h"
 #include "tpc.h"
-
-extern sqlite3 **ctx;
-extern sqlite3_stmt ***stmt;
-
-#define NNULL ((void *)0)
+#include "main.h"
 
 /*
  * the payment transaction
  */
-int payment(int t_num, int w_id_arg, /* warehouse id */
+int payment(int t_num, thread_arg *arg,
+	    int w_id_arg, /* warehouse id */
 	    int d_id_arg, /* district id */
 	    int byname, /* select by c_id or c_last? */
 	    int c_w_id_arg, int c_d_id_arg, int c_id_arg, /* customer id */
@@ -84,7 +81,7 @@ int payment(int t_num, int w_id_arg, /* warehouse id */
 	/*EXEC_SQL UPDATE warehouse SET w_ytd = w_ytd + :h_amount
 	  WHERE w_id =:w_id;*/
 
-	sqlite_stmt = stmt[t_num][9];
+	sqlite_stmt = arg->stmt[9];
 
 	sqlite3_bind_double(sqlite_stmt, 1, h_amount);
 	sqlite3_bind_int64(sqlite_stmt, 2, w_id);
@@ -102,7 +99,7 @@ int payment(int t_num, int w_id_arg, /* warehouse id */
 	                FROM warehouse
 	                WHERE w_id = :w_id;*/
 
-	sqlite_stmt = stmt[t_num][10];
+	sqlite_stmt = arg->stmt[10];
 
 	sqlite3_bind_int64(sqlite_stmt, 1, w_id);
 
@@ -128,7 +125,7 @@ int payment(int t_num, int w_id_arg, /* warehouse id */
 			WHERE d_w_id = :w_id
 			AND d_id = :d_id;*/
 
-	sqlite_stmt = stmt[t_num][11];
+	sqlite_stmt = arg->stmt[11];
 
 	sqlite3_bind_double(sqlite_stmt, 1, h_amount);
 	sqlite3_bind_int64(sqlite_stmt, 2, w_id);
@@ -147,7 +144,7 @@ int payment(int t_num, int w_id_arg, /* warehouse id */
 	                WHERE d_w_id = :w_id
 			AND d_id = :d_id;*/
 
-	sqlite_stmt = stmt[t_num][12];
+	sqlite_stmt = arg->stmt[12];
 
 	sqlite3_bind_int64(sqlite_stmt, 1, w_id);
 	sqlite3_bind_int64(sqlite_stmt, 2, d_id);
@@ -181,7 +178,7 @@ int payment(int t_num, int w_id_arg, /* warehouse id */
 			AND c_d_id = :c_d_id
 		        AND c_last = :c_last;*/
 
-		sqlite_stmt = stmt[t_num][13];
+		sqlite_stmt = arg->stmt[13];
 
 		sqlite3_bind_int64(sqlite_stmt, 1, c_w_id);
 		sqlite3_bind_int64(sqlite_stmt, 2, c_d_id);
@@ -210,7 +207,7 @@ int payment(int t_num, int w_id_arg, /* warehouse id */
 
 			EXEC_SQL OPEN c_byname_p;*/
 
-		sqlite_stmt = stmt[t_num][14];
+		sqlite_stmt = arg->stmt[14];
 
 		sqlite3_bind_int64(sqlite_stmt, 1, c_w_id);
 		sqlite3_bind_int64(sqlite_stmt, 2, c_d_id);
@@ -250,7 +247,7 @@ int payment(int t_num, int w_id_arg, /* warehouse id */
 		AND c_id = :c_id
 		FOR UPDATE;*/
 
-	sqlite_stmt = stmt[t_num][15];
+	sqlite_stmt = arg->stmt[15];
 
 	sqlite3_bind_int64(sqlite_stmt, 1, c_w_id);
 	sqlite3_bind_int64(sqlite_stmt, 2, c_d_id);
@@ -293,7 +290,7 @@ int payment(int t_num, int w_id_arg, /* warehouse id */
 			AND c_d_id = :c_d_id
 			AND c_id = :c_id; */
 
-		sqlite_stmt = stmt[t_num][16];
+		sqlite_stmt = arg->stmt[16];
 
 		sqlite3_bind_int64(sqlite_stmt, 1, c_w_id);
 		sqlite3_bind_int64(sqlite_stmt, 2, c_d_id);
@@ -327,7 +324,7 @@ int payment(int t_num, int w_id_arg, /* warehouse id */
 			AND c_d_id = :c_d_id
 			AND c_id = :c_id;*/
 
-		sqlite_stmt = stmt[t_num][17];
+		sqlite_stmt = arg->stmt[17];
 
 		sqlite3_bind_double(sqlite_stmt, 1, c_balance);
 		sqlite3_bind_text(sqlite_stmt, 2, c_data, -1, SQLITE_STATIC);
@@ -348,7 +345,7 @@ int payment(int t_num, int w_id_arg, /* warehouse id */
 			AND c_d_id = :c_d_id
 			AND c_id = :c_id;*/
 
-		sqlite_stmt = stmt[t_num][18];
+		sqlite_stmt = arg->stmt[18];
 
 		sqlite3_bind_double(sqlite_stmt, 1, c_balance);
 		sqlite3_bind_int64(sqlite_stmt, 2, c_w_id);
@@ -378,7 +375,7 @@ int payment(int t_num, int w_id_arg, /* warehouse id */
 			       :datetime,
 			       :h_amount, :h_data);*/
 
-	sqlite_stmt = stmt[t_num][19];
+	sqlite_stmt = arg->stmt[19];
 
 	sqlite3_bind_int64(sqlite_stmt, 1, c_d_id);
 	sqlite3_bind_int64(sqlite_stmt, 2, c_w_id);
@@ -400,12 +397,12 @@ int payment(int t_num, int w_id_arg, /* warehouse id */
 
 sqlerr:
 	fprintf(stderr, "payment %d:%d\n", t_num, proceed);
-	printf("%s: error: %s\n", __func__, sqlite3_errmsg(ctx[t_num]));
+	printf("%s: error: %s\n", __func__, sqlite3_errmsg(arg->ctx));
 	exit(-1);
 	//error(ctx[t_num],mysql_stmt);
 	/*EXEC SQL WHENEVER SQLERROR GOTO sqlerrerr;*/
 	/*EXEC_SQL ROLLBACK WORK;*/
-	sqlite3_exec(ctx[t_num], "ROLLBACK;", NULL, NULL, NULL);
+	sqlite3_exec(arg->ctx, "ROLLBACK;", NULL, NULL, NULL);
 sqlerrerr:
 	return (0);
 }

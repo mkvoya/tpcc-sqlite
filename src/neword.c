@@ -12,6 +12,7 @@
 
 #include "spt_proc.h"
 #include "tpc.h"
+#include "main.h"
 
 #define pick_dist_info(ol_dist_info, ol_supply_w_id)  \
 	switch (ol_supply_w_id) {                     \
@@ -47,15 +48,14 @@
 		break;                                \
 	}
 
-extern sqlite3 **ctx;
-extern sqlite3_stmt ***stmt;
 
 #define NNULL ((void *)0)
 
 /*
  * the new order transaction
  */
-int neword(int t_num, int w_id_arg, /* warehouse id */
+int neword(int t_num, thread_arg *arg,
+	   int w_id_arg, /* warehouse id */
 	   int d_id_arg, /* district id */
 	   int c_id_arg, /* customer id */
 	   int o_ol_cnt_arg, /* number of items */
@@ -135,7 +135,7 @@ int neword(int t_num, int w_id_arg, /* warehouse id */
 		AND c_w_id = w_id
 		AND c_d_id = :d_id
 		AND c_id = :c_id;*/
-	sqlite_stmt = stmt[t_num][0];
+	sqlite_stmt = arg->stmt[0];
 
 	sqlite3_bind_int64(sqlite_stmt, 1, w_id);
 	sqlite3_bind_int64(sqlite_stmt, 2, d_id);
@@ -168,7 +168,7 @@ int neword(int t_num, int w_id_arg, /* warehouse id */
 		AND d_w_id = :w_id
 		FOR UPDATE;*/
 
-	sqlite_stmt = stmt[t_num][1];
+	sqlite_stmt = arg->stmt[1];
 
 	sqlite3_bind_int64(sqlite_stmt, 1, d_id);
 	sqlite3_bind_int64(sqlite_stmt, 2, w_id);
@@ -192,7 +192,7 @@ int neword(int t_num, int w_id_arg, /* warehouse id */
 	        WHERE d_id = :d_id
 		AND d_w_id = :w_id;*/
 
-	sqlite_stmt = stmt[t_num][2];
+	sqlite_stmt = arg->stmt[2];
 
 	sqlite3_bind_int64(sqlite_stmt, 1, d_next_o_id);
 	sqlite3_bind_int64(sqlite_stmt, 2, d_id);
@@ -216,7 +216,7 @@ int neword(int t_num, int w_id_arg, /* warehouse id */
 		       :datetime,
                        :o_ol_cnt, :o_all_local);*/
 
-	sqlite_stmt = stmt[t_num][3];
+	sqlite_stmt = arg->stmt[3];
 
 	sqlite3_bind_int64(sqlite_stmt, 1, o_id);
 	sqlite3_bind_int64(sqlite_stmt, 2, d_id);
@@ -238,7 +238,7 @@ int neword(int t_num, int w_id_arg, /* warehouse id */
 	/* EXEC_SQL INSERT INTO new_orders (no_o_id, no_d_id, no_w_id)
 	   VALUES (:o_id,:d_id,:w_id); */
 
-	sqlite_stmt = stmt[t_num][4];
+	sqlite_stmt = arg->stmt[4];
 
 	sqlite3_bind_int64(sqlite_stmt, 1, o_id);
 	sqlite3_bind_int64(sqlite_stmt, 2, d_id);
@@ -285,7 +285,7 @@ int neword(int t_num, int w_id_arg, /* warehouse id */
 		        FROM item
 		        WHERE i_id = :ol_i_id;*/
 
-		sqlite_stmt = stmt[t_num][5];
+		sqlite_stmt = arg->stmt[5];
 
 		sqlite3_bind_int64(sqlite_stmt, 1, ol_i_id);
 
@@ -325,7 +325,7 @@ int neword(int t_num, int w_id_arg, /* warehouse id */
 			AND s_w_id = :ol_supply_w_id
 			FOR UPDATE;*/
 
-		sqlite_stmt = stmt[t_num][6];
+		sqlite_stmt = arg->stmt[6];
 
 		sqlite3_bind_int64(sqlite_stmt, 1, ol_i_id);
 		sqlite3_bind_int64(sqlite_stmt, 2, ol_supply_w_id);
@@ -379,7 +379,7 @@ int neword(int t_num, int w_id_arg, /* warehouse id */
 		        WHERE s_i_id = :ol_i_id
 			AND s_w_id = :ol_supply_w_id;*/
 
-		sqlite_stmt = stmt[t_num][7];
+		sqlite_stmt = arg->stmt[7];
 
 		sqlite3_bind_int64(sqlite_stmt, 1, s_quantity);
 		sqlite3_bind_int64(sqlite_stmt, 2, ol_i_id);
@@ -408,7 +408,7 @@ int neword(int t_num, int w_id_arg, /* warehouse id */
 				:ol_supply_w_id, :ol_quantity, :ol_amount,
 				:ol_dist_info);*/
 
-		sqlite_stmt = stmt[t_num][8];
+		sqlite_stmt = arg->stmt[8];
 
 		sqlite3_bind_int64(sqlite_stmt, 1, o_id);
 		sqlite3_bind_int64(sqlite_stmt, 2, d_id);
@@ -442,7 +442,7 @@ int neword(int t_num, int w_id_arg, /* warehouse id */
 
 invaliditem:
 	/*EXEC_SQL ROLLBACK WORK;*/
-	if (sqlite3_exec(ctx[t_num], "ROLLBACK;", NULL, NULL, NULL) !=
+	if (sqlite3_exec(arg->ctx, "ROLLBACK;", NULL, NULL, NULL) !=
 	    SQLITE_OK)
 		goto sqlerr;
 
@@ -451,11 +451,11 @@ invaliditem:
 
 sqlerr:
 	fprintf(stderr, "neword %d:%d\n", t_num, proceed);
-	printf("%s: error: %s\n", __func__, sqlite3_errmsg(ctx[t_num]));
+	printf("%s: error: %s\n", __func__, sqlite3_errmsg(arg->ctx));
 	//error(ctx[t_num],mysql_stmt);
 	/*EXEC SQL WHENEVER SQLERROR GOTO sqlerrerr;*/
 	/*EXEC_SQL ROLLBACK WORK;*/
-	sqlite3_exec(ctx[t_num], "ROLLBACK;", NULL, NULL, NULL);
+	sqlite3_exec(arg->ctx, "ROLLBACK;", NULL, NULL, NULL);
 sqlerrerr:
 	return (0);
 }

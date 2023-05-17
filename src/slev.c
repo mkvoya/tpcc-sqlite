@@ -11,14 +11,13 @@
 
 #include "spt_proc.h"
 #include "tpc.h"
-
-extern sqlite3 **ctx;
-extern sqlite3_stmt ***stmt;
+#include "main.h"
 
 /*
  * the stock level transaction
  */
-int slev(int t_num, int w_id_arg, /* warehouse id */
+int slev(int t_num, thread_arg *arg,
+	 int w_id_arg, /* warehouse id */
 	 int d_id_arg, /* district id */
 	 int level_arg /* stock level */
 )
@@ -47,7 +46,7 @@ int slev(int t_num, int w_id_arg, /* warehouse id */
 	                FROM district
 	                WHERE d_id = :d_id
 			AND d_w_id = :w_id;*/
-	sqlite_stmt = stmt[t_num][32];
+	sqlite_stmt = arg->stmt[32];
 
 	sqlite3_bind_int64(sqlite_stmt, 1, d_id);
 	sqlite3_bind_int64(sqlite_stmt, 2, w_id);
@@ -77,7 +76,7 @@ int slev(int t_num, int w_id_arg, /* warehouse id */
 	EXEC_SQL OPEN ord_line;
 
 	EXEC SQL WHENEVER NOT FOUND GOTO done;*/
-	sqlite_stmt = stmt[t_num][33];
+	sqlite_stmt = arg->stmt[33];
 
 	sqlite3_bind_int64(sqlite_stmt, 1, d_id);
 	sqlite3_bind_int64(sqlite_stmt, 2, w_id);
@@ -95,7 +94,7 @@ int slev(int t_num, int w_id_arg, /* warehouse id */
 			WHERE s_w_id = :w_id
 		        AND s_i_id = :ol_i_id
 			AND s_quantity < :level;*/
-		sqlite_stmt2 = stmt[t_num][34];
+		sqlite_stmt2 = arg->stmt[34];
 
 		sqlite3_bind_int64(sqlite_stmt, 1, w_id);
 		sqlite3_bind_int64(sqlite_stmt, 2, ol_i_id);
@@ -124,21 +123,21 @@ done:
 
 sqlerr:
 	fprintf(stderr, "slev\n");
-	printf("%s: error: %s\n", __func__, sqlite3_errmsg(ctx[t_num]));
+	printf("%s: error: %s\n", __func__, sqlite3_errmsg(arg->ctx));
 	//error(ctx[t_num],mysql_stmt);
 	/*EXEC SQL WHENEVER SQLERROR GOTO sqlerrerr;*/
 	/*EXEC_SQL ROLLBACK WORK;*/
-	sqlite3_exec(ctx[t_num], "ROLLBACK;", NULL, NULL, NULL);
+	sqlite3_exec(arg->ctx, "ROLLBACK;", NULL, NULL, NULL);
 	return (0);
 
 sqlerr2:
 	fprintf(stderr, "slev\n");
-	printf("%s: error: %s\n", __func__, sqlite3_errmsg(ctx[t_num]));
+	printf("%s: error: %s\n", __func__, sqlite3_errmsg(arg->ctx));
 	//error(ctx[t_num],mysql_stmt2);
 	/*EXEC SQL WHENEVER SQLERROR GOTO sqlerrerr;*/
 	/*EXEC_SQL ROLLBACK WORK;*/
 	//mysql_stmt_free_result(mysql_stmt);
 	//mysql_rollback(ctx[t_num]);
-	sqlite3_exec(ctx[t_num], "ROLLBACK;", NULL, NULL, NULL);
+	sqlite3_exec(arg->ctx, "ROLLBACK;", NULL, NULL, NULL);
 	return (0);
 }
